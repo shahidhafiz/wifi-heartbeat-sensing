@@ -218,7 +218,7 @@ class WiFiScanner:
             if ssid_match:
                 current_ssid = ssid_match.group(1).strip()
                 if current_ssid:
-                    seen_ssids[current_ssid] = {'ssid': current_ssid, 'signal': 0, 'bssid': 'N/A', 'channel': 'N/A'}
+                    seen_ssids[current_ssid] = {'ssid': current_ssid, 'signal': -100, 'bssid': 'N/A', 'channel': 'N/A'}
             
             # Look for "Signal             : XX%"
             if 'Signal' in line and '%' in line and current_ssid:
@@ -298,31 +298,45 @@ class WiFiScanner:
 
         return None
 
-    def get_rssi_for_network(self, ssid: str, duration: int = 10) -> List[float]:
+    def get_rssi_for_network(self, ssid: str, duration: int = 10, sample_interval: float = 0.1) -> List[float]:
         """Continuously monitor RSSI for a specific network
         
         Args:
             ssid: Network SSID to monitor
             duration: Duration to monitor in seconds
+            sample_interval: Time between samples in seconds
             
         Returns:
             List of RSSI values (dBm)
         """
         rssi_values = []
         start_time = time.time()
-
+        sample_count = 0
+        
+        print(f"📡 Scanning for network '{ssid}' for {duration} seconds...")
+        
         while time.time() - start_time < duration:
             try:
                 networks = self.scan()
+                
+                # Find matching network
                 for network in networks:
-                    if network.get('ssid') == ssid or network.get('SSID') == ssid:
+                    if network.get('ssid') == ssid:
                         rssi = network.get('signal')
-                        if rssi is not None:
+                        if rssi is not None and rssi != 0 and rssi < 0:  # Valid RSSI should be negative
                             rssi_values.append(rssi)
+                            sample_count += 1
+                            
+                            # Print progress every 10 samples
+                            if sample_count % 10 == 0:
+                                print(f"  ✓ Collected {len(rssi_values)} samples (Signal: {rssi:.1f} dBm)")
                         break
+                
             except Exception as e:
                 print(f"Error scanning: {e}")
 
-            time.sleep(0.1)  # Sample every 100ms
-
+            time.sleep(sample_interval)
+        
+        print(f"✓ Collection complete: {len(rssi_values)} valid RSSI samples collected\n")
+        
         return rssi_values
