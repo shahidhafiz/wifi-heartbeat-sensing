@@ -203,44 +203,51 @@ class WiFiScanner:
         return networks
 
     def _parse_netsh_output(self, output: str) -> List[Dict]:
-        """Parse netsh WiFi output more robustly"""
+        """Parse netsh WiFi output - handles Windows format with SSID # and nested BSSIDs"""
         networks = []
-        current_ssid = None
-        seen_ssids = set()
-
+        seen_ssids = {}  # Track SSIDs and their best signal strength
+        
         lines = output.split('\n')
-        for i, line in enumerate(lines):
-            # Look for SSID line - handles both 'SSID' and 'SSID :' formats
-            if 'SSID' in line and ':' in line:
-                parts = line.split(':', 1)
-                if len(parts) > 1:
-                    ssid = parts[1].strip()
-                    # Filter out invalid SSIDs
-                    if ssid and ssid not in ['1', ''] and len(ssid) > 0:
-                        current_ssid = ssid
-
-            # Look for Signal line
-            if 'Signal' in line and '%' in line:
-                try:
-                    signal_match = re.search(r'(\d+)\s*%', line)
-                    if signal_match and current_ssid:
-                        signal_percent = int(signal_match.group(1))
-                        # Convert percentage to dBm (rough estimate)
-                        signal_dbm = -100 + (signal_percent / 2)
-                        
-                        # Avoid duplicates
-                        if current_ssid not in seen_ssids:
-                            networks.append({
-                                'ssid': current_ssid,
-                                'signal': signal_dbm,
-                                'signal_percent': signal_percent,
-                                'bssid': 'N/A',
-                                'channel': 'N/A'
-                            })
-                            seen_ssids.add(current_ssid)
-                except Exception as e:
-                    pass
-
+        current_ssid = None
+        
+        for line in lines:
+            line_stripped = line.strip()
+            
+            # Look for "SSID X :" pattern
+            ssid_match = re.match(r'SSID\s+\d+\s*:\s*(.+)', line_stripped)
+            if ssid_match:
+                current_ssid = ssid_match.group(1).strip()
+                if current_ssid:
+                    seen_ssids[current_ssid] = {'ssid': current_ssid, 'signal': 0, 'bssid': 'N/A', 'channel': 'N/A'}
+            
+            # Look for "Signal             : XX%"
+            if 'Signal' in line and '%' in line and current_ssid:
+                signal_match = re.search(r'(\d+)\s*%', line)
+                if signal_match:
+                    signal_percent = int(signal_match.group(1))
+                    signal_dbm = -100 + (signal_percent / 2)
+                    
+                    # Store the best (highest) signal for this SSID
+                    if signal_dbm > seen_ssids[current_ssid]['signal']:
+                        seen_ssids[current_ssid]['signal'] = signal_dbm
+                        seen_ssids[current_ssid]['signal_percent'] = signal_percent
+            
+            # Look for BSSID
+            if 'BSSID' in line and ':' in line and not line.startswith('    '):
+                bssid_match = re.search(r'([0-9a-f]{2}(?::[0-9a-f]{2}){5})', line, re.IGNORECASE)
+                if bssid_match and current_ssid:
+                    seen_ssids[current_ssid]['bssid'] = bssid_match.group(1)
+            
+            # Look for Channel
+            if 'Channel' in line and ':' in line and current_ssid:
+                channel_match = re.search(r'Channel\s*:\s*(\d+)', line)
+                if channel_match:
+                    seen_ssids[current_ssid]['channel'] = int(channel_match.group(1))
+        
+        # Convert to list and sort by signal strength
+        networks = list(seen_ssids.values())
+        networks.sort(key=lambda x: x['signal'], reverse=True)
+        
         return networks
 
     def get_connected_network(self) -> Optional[Dict]:
