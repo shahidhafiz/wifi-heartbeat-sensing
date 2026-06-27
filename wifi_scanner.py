@@ -112,7 +112,40 @@ class WiFiScanner:
 
         return networks
 
-    def _parse_iw_output(self, output: str) -> List[Dict]:\n        \"\"\"Parse iw scan output\"\"\"\n        networks = []\n        current_network = {}\n\n        for line in output.split('\n'):\n            line = line.strip()\n\n            if line.startswith('BSS '):\n                if current_network:\n                    networks.append(current_network)\n                current_network = {'bssid': line.split()[1]}\n\n            elif 'SSID:' in line:\n                current_network['ssid'] = line.split('SSID: ')[1]\n\n            elif 'signal:' in line:\n                try:\n                    signal = int(line.split('signal:')[1].split()[0])\n                    current_network['signal'] = signal\n                except:\n                    pass\n\n            elif 'Frequency:' in line:\n                try:\n                    freq = float(line.split('Frequency:')[1].split()[0])\n                    current_network['frequency'] = freq\n                except:\n                    pass\n\n        if current_network:\n            networks.append(current_network)\n\n        return networks
+    def _parse_iw_output(self, output: str) -> List[Dict]:
+        """Parse iw scan output"""
+        networks = []
+        current_network = {}
+
+        for line in output.split('\n'):
+            line = line.strip()
+
+            if line.startswith('BSS '):
+                if current_network:
+                    networks.append(current_network)
+                current_network = {'bssid': line.split()[1]}
+
+            elif 'SSID:' in line:
+                current_network['ssid'] = line.split('SSID: ')[1]
+
+            elif 'signal:' in line:
+                try:
+                    signal = int(line.split('signal:')[1].split()[0])
+                    current_network['signal'] = signal
+                except:
+                    pass
+
+            elif 'Frequency:' in line:
+                try:
+                    freq = float(line.split('Frequency:')[1].split()[0])
+                    current_network['frequency'] = freq
+                except:
+                    pass
+
+        if current_network:
+            networks.append(current_network)
+
+        return networks
 
     def _scan_macos(self) -> List[Dict]:
         """Scan WiFi on macOS"""
@@ -129,9 +162,26 @@ class WiFiScanner:
             
             lines = result.stdout.strip().split('\n')
             for line in lines[1:]:  # Skip header
-                if line.strip():\n                    parts = line.split()\n                    if len(parts) >= 7:\n                        try:\n                            network = {\n                                'bssid': parts[0],\n                                'ssid': parts[1],\n                                'signal': int(parts[2]),\n                                'channel': int(parts[3]),\n                                'ht': parts[4],\n                                'cc': parts[5],\n                                'security': ' '.join(parts[6:]) if len(parts) > 6 else 'Open'\n                            }\n                            networks.append(network)\n                        except:\n                            pass
+                if line.strip():
+                    parts = line.split()
+                    if len(parts) >= 7:
+                        try:
+                            network = {
+                                'bssid': parts[0],
+                                'ssid': parts[1],
+                                'signal': int(parts[2]),
+                                'channel': int(parts[3]),
+                                'ht': parts[4],
+                                'cc': parts[5],
+                                'security': ' '.join(parts[6:]) if len(parts) > 6 else 'Open'
+                            }
+                            networks.append(network)
+                        except:
+                            pass
         except Exception as e:
-            print(f\"macOS scan failed: {e}\")\n\n        return networks
+            print(f"macOS scan failed: {e}")
+
+        return networks
 
     def _scan_windows(self) -> List[Dict]:
         """Scan WiFi on Windows using netsh with improved parsing"""
@@ -148,9 +198,50 @@ class WiFiScanner:
             networks = self._parse_netsh_output(result.stdout)
             
         except Exception as e:
-            print(f\"Windows scan failed: {e}\")\n\n        return networks
+            print(f"Windows scan failed: {e}")
 
-    def _parse_netsh_output(self, output: str) -> List[Dict]:\n        \"\"\"Parse netsh WiFi output more robustly\"\"\"\n        networks = []\n        current_ssid = None\n        seen_ssids = set()\n\n        lines = output.split('\\n')\n        for i, line in enumerate(lines):\n            # Look for SSID line - handles both 'SSID' and 'SSID :' formats\n            if 'SSID' in line and ':' in line:\n                parts = line.split(':', 1)\n                if len(parts) > 1:\n                    ssid = parts[1].strip()\n                    # Filter out invalid SSIDs\n                    if ssid and ssid not in ['1', ''] and len(ssid) > 0:\n                        current_ssid = ssid\n\n            # Look for Signal line\n            if 'Signal' in line and '%' in line:\n                try:\n                    signal_match = re.search(r'(\\d+)\\s*%', line)\n                    if signal_match and current_ssid:\n                        signal_percent = int(signal_match.group(1))\n                        # Convert percentage to dBm (rough estimate)\n                        signal_dbm = -100 + (signal_percent / 2)\n                        \n                        # Avoid duplicates\n                        if current_ssid not in seen_ssids:\n                            networks.append({\n                                'ssid': current_ssid,\n                                'signal': signal_dbm,\n                                'signal_percent': signal_percent,\n                                'bssid': 'N/A',\n                                'channel': 'N/A'\n                            })\n                            seen_ssids.add(current_ssid)\n                except Exception as e:\n                    pass\n\n        return networks
+        return networks
+
+    def _parse_netsh_output(self, output: str) -> List[Dict]:
+        """Parse netsh WiFi output more robustly"""
+        networks = []
+        current_ssid = None
+        seen_ssids = set()
+
+        lines = output.split('\n')
+        for i, line in enumerate(lines):
+            # Look for SSID line - handles both 'SSID' and 'SSID :' formats
+            if 'SSID' in line and ':' in line:
+                parts = line.split(':', 1)
+                if len(parts) > 1:
+                    ssid = parts[1].strip()
+                    # Filter out invalid SSIDs
+                    if ssid and ssid not in ['1', ''] and len(ssid) > 0:
+                        current_ssid = ssid
+
+            # Look for Signal line
+            if 'Signal' in line and '%' in line:
+                try:
+                    signal_match = re.search(r'(\d+)\s*%', line)
+                    if signal_match and current_ssid:
+                        signal_percent = int(signal_match.group(1))
+                        # Convert percentage to dBm (rough estimate)
+                        signal_dbm = -100 + (signal_percent / 2)
+                        
+                        # Avoid duplicates
+                        if current_ssid not in seen_ssids:
+                            networks.append({
+                                'ssid': current_ssid,
+                                'signal': signal_dbm,
+                                'signal_percent': signal_percent,
+                                'bssid': 'N/A',
+                                'channel': 'N/A'
+                            })
+                            seen_ssids.add(current_ssid)
+                except Exception as e:
+                    pass
+
+        return networks
 
     def get_connected_network(self) -> Optional[Dict]:
         """Get information about currently connected network"""
@@ -165,7 +256,7 @@ class WiFiScanner:
                 # Parse iwconfig output
                 for line in result.stdout.split('\n'):
                     if 'ESSID' in line:
-                        return {'ssid': line.split('ESSID:')[1].strip('\"')}
+                        return {'ssid': line.split('ESSID:')[1].strip('"')}
 
             elif self.system == 'Darwin':
                 result = subprocess.run(
@@ -196,7 +287,9 @@ class WiFiScanner:
                         data[key.strip()] = val.strip()
                 return data
         except Exception as e:
-            print(f\"Error getting connected network: {e}\")\n\n        return None
+            print(f"Error getting connected network: {e}")
+
+        return None
 
     def get_rssi_for_network(self, ssid: str, duration: int = 10) -> List[float]:
         """Continuously monitor RSSI for a specific network
@@ -221,4 +314,8 @@ class WiFiScanner:
                             rssi_values.append(rssi)
                         break
             except Exception as e:
-                print(f\"Error scanning: {e}\")\n\n            time.sleep(0.1)  # Sample every 100ms\n\n        return rssi_values
+                print(f"Error scanning: {e}")
+
+            time.sleep(0.1)  # Sample every 100ms
+
+        return rssi_values
