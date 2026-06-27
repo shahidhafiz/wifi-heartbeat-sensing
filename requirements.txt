@@ -1,0 +1,32 @@
+# WiFi Scanning & Network
+scapy>=2.5.0
+netifaces>=0.11.0
+wifi>=0.3.8
+
+# Signal Processing
+numpy>=1.24.0
+scipy>=1.10.0
+scikit-learn>=1.3.0
+
+# Visualization & UI
+matplotlib>=3.7.0
+plotly>=5.17.0
+pandas>=2.0.0
+
+# CLI & Configuration
+click>=8.1.0
+pyyaml>=6.0
+python-dotenv>=1.0.0
+
+# Data & Logging
+pandas>=2.0.0
+python-dateutil>=2.8.2
+
+# System & Utilities
+psutil>=5.9.0
+colorama>=0.4.6
+tqdm>=4.65.0
+
+# Optional: Web Dashboard
+flask>=2.3.0
+flask-cors>=4.0.0
