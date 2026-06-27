@@ -160,7 +160,7 @@ def detect(network, duration, sensitivity, visualize, output):
         # Breathing results
         if result['breathing']['detected']:
             bpm = result['breathing']['breaths_per_minute']
-            click.echo(f"\n🫁  Breathing: {bpm:.1f} breaths/min (confidence: {result['breathing']['confidence']:.1%})")
+            click.echo(f"\n🫁 Breathing: {bpm:.1f} breaths/min (confidence: {result['breathing']['confidence']:.1%})")
 
         # Signal quality
         quality = result['signal_quality']
@@ -224,7 +224,7 @@ def monitor(network, interval, max_duration):
 @cli.command()
 def config_show():
     """Show current configuration"""
-    click.echo("\n📋 Current Configuration\n")
+    click.echo("\n❤️  Current Configuration\n")
     click.echo("Signal Processing:")
     click.echo(f"  Sample Rate: {config.SAMPLE_RATE} Hz")
     click.echo(f"  Window Size: {config.WINDOW_SIZE}")
